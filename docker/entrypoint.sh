@@ -42,6 +42,8 @@
 #                          Setting this enables local-mode auth so the session
 #                          API key is validated internally instead of against the
 #                          OpenHands cloud API.
+#   AUTOMATION_KV_SECRET  – Signing key for scoped automation KV tokens
+#                          (defaults to the shared session API key).
 #   FILE_STORE             – Storage backend for automation tarballs (default: local).
 #                          Without this the automation backend may fall back to
 #                          S3/GCS which fails without cloud credentials.
@@ -205,8 +207,15 @@ if [ -z "${LOCAL_BACKEND_API_KEY:-}" ] && [ -z "${OH_SESSION_API_KEYS_0:-}" ]; t
     chmod 600 "$API_KEY_FILE"
     log "Generated API key (persisted to $API_KEY_FILE)"
   fi
-  export OH_SESSION_API_KEYS_0="$LOCAL_BACKEND_API_KEY"
 fi
+
+# The agent server reads OH_SESSION_API_KEYS_0, not LOCAL_BACKEND_API_KEY.
+# Mirror the resolved key into it whenever it was not set directly, so a
+# custom LOCAL_BACKEND_API_KEY actually secures the agent server too (an
+# explicitly set OH_SESSION_API_KEYS_0 always wins). No SESSION_API_KEY alias
+# on purpose: the npm launcher deliberately omits it (the SDK's
+# sanitized_env() strips it from bash subprocesses anyway).
+export OH_SESSION_API_KEYS_0="${OH_SESSION_API_KEYS_0:-${LOCAL_BACKEND_API_KEY:-}}"
 
 # Both backends share the same API key value and the same `X-Session-API-Key`
 # header for authentication.  Default OPENHANDS_AUTOMATION_API_KEY to the
@@ -219,6 +228,7 @@ fi
 export OPENHANDS_AUTOMATION_API_KEY="${OPENHANDS_AUTOMATION_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
 export AUTOMATION_LOCAL_API_KEY="${AUTOMATION_LOCAL_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
 export AUTOMATION_AGENT_SERVER_API_KEY="${AUTOMATION_AGENT_SERVER_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
+export AUTOMATION_KV_SECRET="${AUTOMATION_KV_SECRET:-${EFFECTIVE_SESSION_KEY}}"
 export OPENHANDS_REMOTE_WS_READY_REQUIRED="${OPENHANDS_REMOTE_WS_READY_REQUIRED:-false}"
 if [ -z "${AUTOMATION_POSTHOG_API_KEY:-}" ]; then
   if [ -n "${VITE_POSTHOG_API_KEY:-}" ]; then
